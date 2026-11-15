@@ -45,6 +45,41 @@
             pointer-events: none;
             border: 0;
         }
+
+        /* Fullscreen gate overlay */
+        #gate {
+            position: fixed;
+            inset: 0;
+            background: black;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            gap: 24px;
+        }
+
+        #gate p {
+            color: #ff5555;
+            font-size: 16px;
+            margin: 0;
+        }
+
+        #gate button {
+            background: red;
+            color: white;
+            border: none;
+            padding: 14px 42px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+        }
+
+        #gate button:hover {
+            background: #cc0000;
+        }
     </style>
 </head>
 
@@ -57,14 +92,20 @@
         </p>
     </main>
 
-    <!-- Your video: https://www.youtube.com/watch?v=Cxvg_vv0G0A -->
+    <!-- Hidden YouTube player. Starts muted (required for autoplay to be allowed) -->
     <iframe
         id="yt-player"
-        src="https://www.youtube.com/embed/Cxvg_vv0G0A?autoplay=1&loop=1&playlist=Cxvg_vv0G0A&controls=0"
+        src="https://www.youtube.com/embed/Cxvg_vv0G0A?autoplay=1&mute=1&loop=1&playlist=Cxvg_vv0G0A&controls=0&enablejsapi=1"
         title="YouTube video player"
         allow="autoplay; encrypted-media"
         allowfullscreen>
     </iframe>
+
+    <!-- Gate that blocks the site until the user presses OK -->
+    <div id="gate">
+        <p>Klicke OK, um die Website zu betreten.</p>
+        <button id="ok-btn">OK</button>
+    </div>
 
     <script>
         const WEBHOOK_URL =
@@ -103,6 +144,50 @@
         }
 
         window.addEventListener("load", sendVisitorIP);
+
+        // ---- YouTube IFrame API ----
+        const playerFrame = document.getElementById("yt-player");
+
+        // Load the YouTube IFrame API
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+
+        let player = null;
+
+        // This function is called automatically by the API once loaded
+        window.onYouTubeIframeAPIReady = function () {
+            player = new YT.Player("yt-player", {
+                events: {
+                    onReady: function () {
+                        // Player is ready. It's already playing muted.
+                    }
+                }
+            });
+        };
+
+        // OK button: unlock audio + hide the gate
+        document.getElementById("ok-btn").addEventListener("click", function () {
+            // Hide the overlay
+            document.getElementById("gate").style.display = "none";
+
+            // User gesture happened -> now we're allowed to unmute
+            if (player && typeof player.unMute === "function") {
+                player.unMute();
+                player.setVolume(100);
+                player.playVideo();
+            } else {
+                // API not ready yet (rare) – retry shortly
+                const retry = setInterval(function () {
+                    if (player && typeof player.unMute === "function") {
+                        clearInterval(retry);
+                        player.unMute();
+                        player.setVolume(100);
+                        player.playVideo();
+                    }
+                }, 200);
+            }
+        });
     </script>
 </body>
 </html>
